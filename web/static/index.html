@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>直播间图片生成</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { text-align: center; margin-bottom: 24px; color: #333; }
+h2 { font-size: 16px; color: #555; margin-bottom: 12px; }
+
+.section { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.form-row { display: flex; gap: 16px; margin-bottom: 16px; }
+.form-group { flex: 1; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #555; font-size: 14px; }
+.form-group input[type="text"], .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+.form-group textarea { height: 60px; resize: vertical; }
+
+.upload-area { border: 2px dashed #ccc; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; }
+.upload-area:hover { border-color: #4a90d9; }
+.upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-area .label { color: #888; font-size: 14px; }
+.upload-preview { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.upload-preview img { height: 60px; border-radius: 4px; object-fit: cover; }
+
+.btn { background: #4a90d9; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
+.btn:hover { background: #3a7bc8; }
+.btn:disabled { background: #ccc; cursor: not-allowed; }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+.btn-outline { background: transparent; border: 1px solid #4a90d9; color: #4a90d9; }
+.btn-outline:hover { background: #f0f7ff; }
+
+.status-text { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 16px; }
+
+/* Round cards */
+.round-card { border: 1px solid #eee; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+.round-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.round-card-header .round-title { font-weight: 600; font-size: 14px; }
+.round-card-header .round-status { font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+.round-status.pass { background: #e8f5e9; color: #4caf50; }
+.round-status.fail { background: #fbe9e7; color: #f44336; }
+.round-card-body { display: flex; gap: 16px; }
+.round-image { width: 180px; height: 180px; object-fit: cover; border-radius: 8px; cursor: pointer; transition: transform 0.2s; border: 1px solid #eee; }
+.round-image:hover { transform: scale(1.02); }
+.round-details { flex: 1; }
+
+.scores-mini { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.score-badge { font-size: 11px; padding: 3px 8px; border-radius: 4px; background: #f5f5f5; }
+.score-badge.high { background: #e8f5e9; color: #388e3c; }
+.score-badge.mid { background: #fff3e0; color: #f57c00; }
+.score-badge.low { background: #fbe9e7; color: #d32f2f; }
+
+.issues-list { list-style: none; }
+.issues-list li { font-size: 12px; color: #666; margin-bottom: 3px; padding-left: 12px; position: relative; }
+.issues-list li::before { content: "•"; position: absolute; left: 0; color: #f44336; }
+
+/* Final result */
+.final-section { text-align: center; }
+.final-image { max-width: 100%; max-height: 600px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); cursor: pointer; }
+.final-status { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+.final-status.pass { color: #4caf50; }
+.final-status.partial { color: #ff9800; }
+.final-actions { margin-top: 12px; display: flex; gap: 8px; justify-content: center; }
+
+/* Edit section */
+.edit-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+.edit-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.edit-row input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+.edit-gallery { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.edit-item { text-align: center; }
+.edit-item img { height: 200px; border-radius: 8px; cursor: pointer; border: 1px solid #eee; }
+.edit-item .edit-actions { margin-top: 6px; }
+
+/* Prompt viewer */
+.prompt-toggle { font-size: 12px; color: #4a90d9; cursor: pointer; margin-left: 8px; }
+.prompt-toggle:hover { text-decoration: underline; }
+.prompt-box { display: none; margin-top: 8px; padding: 10px; background: #f8f9fa; border-radius: 6px; font-size: 12px; color: #555; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; border: 1px solid #eee; }
+.prompt-box.visible { display: block; }
+
+/* Restart reason */
+.restart-badge { font-size: 12px; padding: 3px 8px; border-radius: 4px; background: #fff3e0; color: #e65100; margin-left: 8px; }
+
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; align-items: center; justify-content: center; cursor: pointer; }
+.lightbox.active { display: flex; }
+.lightbox img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 8px; }
+.lightbox-close { position: absolute; top: 20px; right: 20px; color: #fff; font-size: 32px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>直播间图片生成</h1>
+
+<div class="section">
+  <div class="form-row">
+    <div class="form-group">
+      <label>参考直播间图片</label>
+      <div class="upload-area"><input type="file" accept="image/*" id="ref-input"><div class="label">点击上传参考图</div><div class="upload-preview" id="ref-preview"></div></div>
+    </div>
+    <div class="form-group">
+      <label>产品图片</label>
+      <div class="upload-area" id="prod-upload-area"><input type="file" accept="image/*" id="prod-input"><div class="label">点击添加产品图（可多次添加）</div></div>
+      <div class="upload-preview" id="prod-preview" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>人物描述</label><input type="text" id="person" placeholder="例如：马来西亚年轻女性"></div>
+    <div class="form-group">
+      <label>背景描述</label>
+      <select id="background-select" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;" onchange="onBackgroundChange()">
+        <option value="">自定义输入...</option>
+        <option value="保健品货柜">保健品货柜</option>
+        <option value="美妆产品展示架">美妆产品展示架</option>
+        <option value="简约白色直播间">简约白色直播间</option>
+        <option value="家居客厅场景">家居客厅场景</option>
+        <option value="食品零食货架">食品零食货架</option>
+        <option value="母婴用品展示区">母婴用品展示区</option>
+        <option value="数码产品展台">数码产品展台</option>
+        <option value="服装展示间">服装展示间</option>
+      </select>
+      <input type="text" id="background-custom" placeholder="输入自定义背景描述" style="margin-top:6px;">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>商品位置</label>
+      <select id="product-position" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;" onchange="onPositionChange()">
+        <option value="桌前展示" selected>摆在桌前</option>
+        <option value="主播手持">主播手持</option>
+        <option value="参考原图">参考原图</option>
+        <option value="custom">自定义...</option>
+      </select>
+      <input type="text" id="position-custom" placeholder="输入自定义商品位置描述" style="margin-top:6px;display:none;">
+    </div>
+    <div class="form-group"><label>补充说明</label><textarea id="notes" placeholder="例如：产品图中的瓶子大小是一样大的" style="height:70px"></textarea></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>图片比例</label>
+      <select id="aspect-ratio" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+        <option value="9:16" selected>9:16 竖屏（直播间常用）</option>
+        <option value="3:4">3:4 竖屏</option>
+        <option value="1:1">1:1 正方形</option>
+        <option value="4:3">4:3 横屏</option>
+        <option value="16:9">16:9 横屏</option>
+        <option value="auto">自动（跟随参考图）</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>迭代轮次</label>
+      <select id="max-rounds" style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+        <option value="3">3 轮（快速）</option>
+        <option value="5" selected>5 轮（默认）</option>
+        <option value="8">8 轮</option>
+        <option value="10">10 轮</option>
+        <option value="15">15 轮（精细）</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn" id="generate-btn" onclick="startGeneration()" style="margin-top:16px">开始生成</button>
+</div>
+
+<div class="section" id="progress-section" style="display:none">
+  <div class="status-text" id="status-text">准备中...</div>
+  <div id="rounds-container"></div>
+</div>
+
+<div class="section" id="final-section" style="display:none">
+  <div class="final-section">
+    <div class="final-status" id="final-status"></div>
+    <img class="final-image" id="final-image" onclick="openLightbox(this.src)">
+    <div class="final-actions">
+      <button class="btn btn-sm" id="download-final-btn">下载最终结果</button>
+    </div>
+    <div class="edit-section">
+      <h2>二次编辑</h2>
+      <div class="edit-row">
+        <input type="text" id="edit-instruction" placeholder="输入修改指令，例如：将背景颜色调亮一些">
+        <button class="btn btn-sm" id="edit-btn" onclick="editImage()">编辑</button>
+      </div>
+      <div class="edit-gallery" id="edit-gallery"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">&times;</span>
+  <img id="lightbox-img">
+</div>
+
+<script>
+let jobId = null;
+let productFiles = [];
+const scoreNames = {pose_realism:'姿势', product_accuracy:'产品', product_size:'大小', requirements_match:'需求', physics:'物理'};
+
+document.getElementById('ref-input').addEventListener('change', e => showPreviews('ref-preview', e.target.files));
+document.getElementById('prod-input').addEventListener('change', e => {
+  for (const f of e.target.files) productFiles.push(f);
+  renderProductPreviews();
+  e.target.value = '';
+});
+
+function showPreviews(id, files) {
+  const c = document.getElementById(id); c.innerHTML = '';
+  for (const f of files) { const img = document.createElement('img'); img.src = URL.createObjectURL(f); c.appendChild(img); }
+}
+
+function renderProductPreviews() {
+  const c = document.getElementById('prod-preview'); c.innerHTML = '';
+  productFiles.forEach((f, i) => {
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'position:relative;display:inline-block;';
+    const img = document.createElement('img'); img.src = URL.createObjectURL(f); img.style.height = '60px'; img.style.borderRadius = '4px';
+    const del = document.createElement('span');
+    del.textContent = '×'; del.style.cssText = 'position:absolute;top:-4px;right:-4px;background:#f44336;color:#fff;border-radius:50%;width:16px;height:16px;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    del.onclick = () => { productFiles.splice(i, 1); renderProductPreviews(); };
+    wrap.appendChild(img); wrap.appendChild(del); c.appendChild(wrap);
+  });
+}
+
+function onBackgroundChange() {
+  const sel = document.getElementById('background-select');
+  const custom = document.getElementById('background-custom');
+  if (sel.value === '') { custom.style.display = 'block'; custom.focus(); }
+  else { custom.style.display = 'none'; custom.value = ''; }
+}
+
+function onPositionChange() {
+  const sel = document.getElementById('product-position');
+  const custom = document.getElementById('position-custom');
+  if (sel.value === 'custom') { custom.style.display = 'block'; custom.focus(); }
+  else { custom.style.display = 'none'; custom.value = ''; }
+}
+
+function getBackground() {
+  const sel = document.getElementById('background-select');
+  if (sel.value) return sel.value;
+  return document.getElementById('background-custom').value;
+}
+
+function getProductPosition() {
+  const sel = document.getElementById('product-position');
+  if (sel.value === 'custom') return document.getElementById('position-custom').value;
+  return sel.value;
+}
+
+function openLightbox(src) { document.getElementById('lightbox-img').src = src; document.getElementById('lightbox').classList.add('active'); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+function downloadImage(url, filename) {
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+}
+
+async function startGeneration() {
+  const refFiles = document.getElementById('ref-input').files;
+  const person = document.getElementById('person').value;
+  const background = getBackground();
+  const position = getProductPosition();
+  const notes = document.getElementById('notes').value;
+  const aspectRatio = document.getElementById('aspect-ratio').value;
+  const maxRounds = document.getElementById('max-rounds').value;
+
+  if (!refFiles.length || !productFiles.length || !person || !background) { alert('请填写所有必填项（参考图、产品图、人物描述、背景描述）'); return; }
+
+  const formData = new FormData();
+  formData.append('reference', refFiles[0]);
+  for (const f of productFiles) formData.append('products', f);
+  formData.append('person', person);
+  formData.append('background', background);
+  formData.append('position', position);
+  formData.append('notes', notes);
+  formData.append('aspect_ratio', aspectRatio);
+  formData.append('max_rounds', maxRounds);
+
+  document.getElementById('generate-btn').disabled = true;
+  document.getElementById('progress-section').style.display = 'block';
+  document.getElementById('final-section').style.display = 'none';
+  document.getElementById('status-text').textContent = '提交中...';
+  document.getElementById('rounds-container').innerHTML = '';
+
+  const resp = await fetch('/api/generate', { method: 'POST', body: formData });
+  const data = await resp.json();
+  jobId = data.job_id;
+
+  const source = new EventSource(`/api/progress/${jobId}`);
+  source.onmessage = (e) => {
+    const event = JSON.parse(e.data);
+    handleEvent(event);
+    if (event.event === 'completed' || event.event === 'error') { source.close(); document.getElementById('generate-btn').disabled = false; }
+  };
+  source.onerror = () => { source.close(); document.getElementById('generate-btn').disabled = false; };
+}
+
+let currentRoundCard = null;
+let pendingFixPrompt = {};
+
+function handleEvent(event) {
+  const statusEl = document.getElementById('status-text');
+  switch (event.event) {
+    case 'started':
+      statusEl.textContent = `开始生成（最多 ${event.data.max_rounds} 轮）`;
+      break;
+    case 'round_image':
+      addRoundImage(event.round, event.data.image, event.data.prompt || pendingFixPrompt[event.round] || '');
+      delete pendingFixPrompt[event.round];
+      break;
+    case 'evaluating':
+      statusEl.textContent = `第 ${event.round} 轮：评估中...`;
+      break;
+    case 'evaluation_done':
+      statusEl.textContent = `第 ${event.round} 轮：${event.data.passed ? '通过' : '未通过'}（${event.data.total}分）`;
+      addEvaluation(event.round, event.data);
+      break;
+    case 'fixing':
+      statusEl.textContent = `第 ${event.round} 轮：修正生成中...`;
+      if (event.data.prompt) pendingFixPrompt[event.round] = event.data.prompt;
+      break;
+    case 'restarting':
+      statusEl.textContent = `第 ${event.round} 轮：${event.data.reason || '重新生成...'}`;
+      addRestartBadge(event.data.reason);
+      break;
+    case 'completed':
+      showFinal(event.data);
+      break;
+    case 'error':
+      statusEl.textContent = `错误：${event.data.message}`;
+      statusEl.style.color = '#f44336';
+      break;
+  }
+}
+
+function addRoundImage(round, filename, prompt) {
+  const container = document.getElementById('rounds-container');
+  const card = document.createElement('div');
+  card.className = 'round-card';
+  card.id = `round-card-${round}`;
+  const imgUrl = `/api/image/${jobId}/${filename}`;
+  const promptId = `prompt-${round}`;
+  let promptHtml = '';
+  if (prompt) {
+    promptHtml = `<span class="prompt-toggle" onclick="togglePrompt('${promptId}')">查看提示词</span>
+      <div class="prompt-box" id="${promptId}">${escapeHtml(prompt)}</div>`;
+  }
+  card.innerHTML = `
+    <div class="round-card-header"><span class="round-title">Round ${round}</span><span class="round-status" id="round-status-${round}">生成完成</span></div>
+    <div class="round-card-body">
+      <img class="round-image" src="${imgUrl}" onclick="openLightbox('${imgUrl}')">
+      <div class="round-details" id="round-details-${round}">
+        <button class="btn btn-sm btn-outline" onclick="downloadImage('/api/download/${jobId}/${filename}', '${filename}')">下载</button>
+        ${promptHtml}
+      </div>
+    </div>`;
+  container.appendChild(card);
+  currentRoundCard = card;
+}
+
+function togglePrompt(id) { document.getElementById(id).classList.toggle('visible'); }
+function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+
+function addRestartBadge(reason) {
+  const container = document.getElementById('rounds-container');
+  const badge = document.createElement('div');
+  badge.style.cssText = 'padding:8px 12px;margin-bottom:8px;background:#fff3e0;border-radius:6px;font-size:12px;color:#e65100;border:1px solid #ffe0b2;';
+  badge.textContent = '↻ ' + (reason || '重新生成');
+  container.appendChild(badge);
+}
+
+function addEvaluation(round, data) {
+  const details = document.getElementById(`round-details-${round}`);
+  const status = document.getElementById(`round-status-${round}`);
+  if (!details) return;
+
+  status.textContent = data.passed ? '通过' : '未通过';
+  status.className = `round-status ${data.passed ? 'pass' : 'fail'}`;
+
+  let scoresHtml = '<div class="scores-mini">';
+  for (const [key, label] of Object.entries(scoreNames)) {
+    const val = data.scores[key] || 0;
+    const cls = val >= 4 ? 'high' : val >= 3 ? 'mid' : 'low';
+    scoresHtml += `<span class="score-badge ${cls}">${label} ${val}/5</span>`;
+  }
+  scoresHtml += '</div>';
+
+  let issuesHtml = '';
+  if (data.issues && data.issues.length) {
+    issuesHtml = '<ul class="issues-list">' + data.issues.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  }
+
+  const existing = details.querySelector('.scores-mini');
+  if (existing) existing.remove();
+  const existingIssues = details.querySelector('.issues-list');
+  if (existingIssues) existingIssues.remove();
+
+  details.insertAdjacentHTML('afterbegin', issuesHtml);
+  details.insertAdjacentHTML('afterbegin', scoresHtml);
+}
+
+function showFinal(data) {
+  const section = document.getElementById('final-section');
+  section.style.display = 'block';
+  const statusEl = document.getElementById('final-status');
+  statusEl.textContent = data.partial ? '部分完成（返回最佳结果）' : '生成通过';
+  statusEl.className = `final-status ${data.partial ? 'partial' : 'pass'}`;
+
+  const imgUrl = `/api/image/${jobId}/${data.image}`;
+  document.getElementById('final-image').src = imgUrl;
+  document.getElementById('download-final-btn').onclick = () => downloadImage(`/api/download/${jobId}/${data.image}`, `final_${jobId}.png`);
+  document.getElementById('edit-gallery').innerHTML = '';
+  document.getElementById('status-text').textContent = data.partial ? '已完成（部分）' : '已完成';
+}
+
+async function editImage() {
+  const instruction = document.getElementById('edit-instruction').value.trim();
+  if (!instruction) { alert('请输入编辑指令'); return; }
+
+  const btn = document.getElementById('edit-btn');
+  btn.disabled = true; btn.textContent = '编辑中...';
+
+  try {
+    const formData = new FormData();
+    formData.append('instruction', instruction);
+    const resp = await fetch(`/api/edit/${jobId}`, { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.error) { alert('编辑失败：' + data.error); return; }
+
+    const gallery = document.getElementById('edit-gallery');
+    const imgUrl = `/api/image/${jobId}/${data.image}`;
+    const item = document.createElement('div');
+    item.className = 'edit-item';
+    item.innerHTML = `
+      <img src="${imgUrl}" onclick="openLightbox('${imgUrl}')">
+      <div class="edit-actions">
+        <button class="btn btn-sm btn-outline" onclick="downloadImage('/api/download/${jobId}/${data.image}', '${data.image}')">下载</button>
+      </div>`;
+    gallery.appendChild(item);
+    document.getElementById('edit-instruction').value = '';
+  } catch (e) { alert('编辑请求失败：' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '编辑'; }
+}
+</script>
+</body>
+</html>

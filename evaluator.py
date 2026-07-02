@@ -27,7 +27,7 @@ def evaluate(
     except Exception as e:
         logger.warning(f"Evaluation failed: {e}")
         return Evaluation(
-            scores=EvaluationScores(pose_realism=2, product_accuracy=2, product_size=2, person_match=2, background_match=2),
+            scores=EvaluationScores(pose_realism=2, product_accuracy=2, product_size=2, requirements_match=2, physics=2),
             issues=["评估调用失败，需要重新生成"],
             passed=False,
         )
